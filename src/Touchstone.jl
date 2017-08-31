@@ -1,7 +1,7 @@
 __precompile__()
 module Touchstone
-using FileIO, AxisArrays
-export loadset
+using FileIO, AxisArrays, Interpolations
+export Linear, Constant, loadset
 
 const tsextensions = [".s2p",".s3p",".s4p",".s5p",".s6p",".s7p",".s8p",".ts"]
 function __init__()
@@ -9,25 +9,77 @@ function __init__()
 end
 
 """
-    loadset(path::String)
-Loads a set of Touchstone files found in a given directory `path` that
-represent a parameter sweep. All files will be combined into a single
-AxisArray with axes for each swept parameter.
+    loadset(path::String; interpolation = Linear())
+Loads a set of Touchstone files found in a given directory `path` that represent a
+parameter sweep. All files will be combined into a single AxisArray with axes for each swept
+parameter.
+
+Sometimes Sonnet will report different frequencies for different values of the swept
+parameter when running in Adaptive Band Synthesis mode. The frequency axis lengths won't
+match in this case, so a merged frequency axis is constructed. The simulation results are
+then interpolated over the merged frequency axis. Either `Linear()` or `Constant()`
+(nearest neighbor) may be passed using the `interp` keyword argument.
 """
-function loadset(path::String)
+function loadset(path::String; interp = Linear())
+    # Load each file in its own AxisArray.
+    local axarrs
     first = true
-    local a
     for f in readdir(path)
         if any(endswith(f, ext) for ext in tsextensions)
             if first
                 first = false
-                a = FileIO.load(joinpath(path,f))
+                axarrs = [FileIO.load(joinpath(path,f))]
             else
-                a = merge(a, FileIO.load(joinpath(path,f)))
+                push!(axarrs, FileIO.load(joinpath(path,f)))
             end
         end
     end
-    return a
+
+    # Do all the frequencies match?
+    # The following does a pairwise comparison of the frequency axes in all files.
+    # Only the upper (lower?) triangle of the pairwise comparison matrix is used.
+    fmatches = all([(i, a[Axis{:f}].val == b[Axis{:f}].val)[2]
+        for (i,a) in enumerate(axarrs) for b in axarrs[i:end]])
+
+    # TODO: merge :parameter axes like we do with :f if they don't match.
+
+    if fmatches
+        return merge(axarrs...)
+    else
+        # Find combined frequency axis
+        faxis = axarrs[1][Axis{:f}].val
+        for j in axarrs[2:end]
+            faxis = union(faxis, j[Axis{:f}].val)
+        end
+        sort!(faxis)
+
+        local newaxarrs
+        first = true
+        for a in axarrs
+            if first
+                first = false
+                newaxarrs = [
+                    AxisArray(zeros(size(a)[1:4]..., length(faxis), size(a)[6:end]...),
+                        axes(a)[1:4]..., Axis{:f}(faxis), axes(a)[6:end]...)
+                    ]
+            else
+                push!(newaxarrs, AxisArray(zeros(size(a)[1:4]..., length(faxis),
+                    size(a)[6:end]...), axes(a)[1:4]..., Axis{:f}(faxis), axes(a)[6:end]...))
+            end
+
+            # This is a little ugly, probably could be better but Interpolations.jl doesn't
+            # seem to allow interpolating when there are dimensions of length 1
+            b = newaxarrs[end]
+            for f in a[Axis{:format}].val, p in a[Axis{:parameter}].val,
+                i in a[Axis{:to}].val, j in a[Axis{:from}].val
+                onetuple = ntuple(x->1, ndims(a)-5)
+                b[f,p,i,j,:,onetuple...] =
+                    interpolate((a[Axis{:f}].val, ), a[f,p,i,j,:,onetuple...].data,
+                        Gridded(interp))[faxis]
+            end
+        end
+        return merge(newaxarrs...)
+    end
 end
 
 function FileIO.load(f::File{format"TS"}; kwargs...)
@@ -61,7 +113,7 @@ function FileIO.load(s0::Stream{format"TS"};
         :format=>"ma",
         :resistance=>50.0
     )
-    paramaxes = AxisArrays.Axis[]
+    sweepaxes = AxisArrays.Axis[]
     freq = Float64[]
     data = Float64[]
     lct = 0
@@ -73,7 +125,7 @@ function FileIO.load(s0::Stream{format"TS"};
                 l == "!< END PARAMS" && break
                 param = replace(l[4:end], " ", "")
                 (k,v) = (split(param, "=")...)
-                push!(paramaxes, AxisArrays.Axis{Symbol(k)}([parse(Float64, v)]))
+                push!(sweepaxes, AxisArrays.Axis{Symbol(k)}([parse(Float64, v)]))
             end
             continue
         end
@@ -128,9 +180,14 @@ function FileIO.load(s0::Stream{format"TS"};
     #       (required by Touchstone spec)
 
     reshapeddata = reshape(data,
-        (2, nports^2, length(freq), ntuple(x->1, length(paramaxes))...))
-    return AxisArrays.AxisArray(reshapeddata, format_axis(opts[:format]),
-        param_axis(opts[:parameter], nports), Axis{:f}(freq), paramaxes...)
+        (2, 1, nports, nports, length(freq), ntuple(x->1, length(sweepaxes))...))
+    axarr = AxisArrays.AxisArray(reshapeddata, format_axis(opts[:format]),
+        param_axes(opts[:parameter], nports)..., Axis{:f}(freq), sweepaxes...)
+    if nports == 2
+        return axarr
+    else
+        return permutedims(axarr, [1,2,4,3,5:ndims(axarr)...])
+    end
 end
 
 """
@@ -151,20 +208,41 @@ function format_axis(fmt)
 end
 
 """
-    param_axis(param, nports)
+    param_axes(param, nports)
 Given a parameter code from the options line of the file and some number
-of ports, return a suitable `AxisArrays.Axis{:parameter}` object.
+of ports, return suitable `AxisArrays.Axis{:parameter}`, `AxisArrays.Axis{:out}`,
+`AxisArrays.Axis{:in}` objects.
 """
-function param_axis(param, nports)
+function param_axes(param, nports)
     if nports == 2
-        return Axis{:parameter}(Symbol.(param.*["11","21","12","22"]))
+        # Touchstone file has S11, S21, S12, S22 on data line.
+        # The "fast axis" of the data is the "to" port
+        return Axis{:parameter}([Symbol(uppercase(param))]),
+            Axis{:to}(Base.OneTo(2)), Axis{:from}(Base.OneTo(2))
     else
-        numvec = string.(collect(1:nports))
-        numrow = reshape(numvec,1,length(numvec))
-        return Axis{:parameter}(
-            Symbol.(param.*(permutedims(numvec.*numrow,(2,1))[:])))
+        # Touchstone file has S11, S12, S13; S21, S22, S23; etc. on data lines.
+        # The "fast axis" of the data is the "from" port
+        return Axis{:parameter}([Symbol(uppercase(param))]),
+            Axis{:from}(Base.OneTo(nports)), Axis{:to}(Base.OneTo(nports))
     end
 end
+
+# """
+#     param_axis(param, nports)
+# Given a parameter code from the options line of the file and some number
+# of ports, return a suitable `AxisArrays.Axis{:parameter}` object, e.g.
+# `AxisArrays.Axis{:parameter}([:s11,:s21,:s12,:s22])`.
+# """
+# function param_axis(param, nports)
+#     if nports == 2
+#         return Axis{:parameter}(Symbol.(param.*["11","21","12","22"]))
+#     else
+#         numvec = string.(collect(1:nports))
+#         numrow = reshape(numvec,1,length(numvec))
+#         return Axis{:parameter}(
+#             Symbol.(param.*(permutedims(numvec.*numrow,(2,1))[:])))
+#     end
+# end
 
 """
     nlines(nports)

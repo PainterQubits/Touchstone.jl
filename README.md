@@ -9,6 +9,12 @@
 Reads Touchstone files into [AxisArrays](https://github.com/JuliaArrays/AxisArrays.jl).
 Supports Sonnet parameter sweeps.
 
+## What's a Touchstone file?
+
+The gory details:
+
+- [Touchstone v1.1 specification](https://ibis.org/connector/touchstone_spec11.pdf)
+- [Touchstone v2.0 specification](http://www.ibis.org/touchstone_ver2.0/touchstone_ver2_0.pdf)
 
 ## Usage
 

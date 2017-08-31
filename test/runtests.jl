@@ -1,7 +1,7 @@
 using Touchstone
 using Base.Test, AxisArrays
 
-using Touchstone: nlines, expectednum
+using Touchstone: nlines, expectednum, format_axis, param_axes
 
 @testset "Data line unit tests" begin
     # S1P

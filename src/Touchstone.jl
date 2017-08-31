@@ -186,6 +186,8 @@ function FileIO.load(s0::Stream{format"TS"};
     if nports == 2
         return axarr
     else
+        # We want to have Axis{:to} before Axis{:from} so that the indices always
+        # are ordered like the subscripts on e.g. S_{21}.
         return permutedims(axarr, [1,2,4,3,5:ndims(axarr)...])
     end
 end

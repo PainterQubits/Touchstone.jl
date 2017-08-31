@@ -61,11 +61,11 @@ end
     @test_throws ErrorException format_axis("zzz")
 
     @test param_axes("s", 1) ==
-        Axis{:parameter}([:S]), Axis{:from}(Base.OneTo(1)), Axis{:to}(Base.OneTo(1))
+        (Axis{:parameter}([:S]), Axis{:from}(Base.OneTo(1)), Axis{:to}(Base.OneTo(1)))
     @test param_axes("s", 2) ==
-        Axis{:parameter}([:S]), Axis{:to}(Base.OneTo(2)), Axis{:from}(Base.OneTo(2))
+        (Axis{:parameter}([:S]), Axis{:to}(Base.OneTo(2)), Axis{:from}(Base.OneTo(2)))
     @test param_axes("s", 3) ==
-        Axis{:parameter}([:S]), Axis{:from}(Base.OneTo(3)), Axis{:to}(Base.OneTo(3))
+        (Axis{:parameter}([:S]), Axis{:from}(Base.OneTo(3)), Axis{:to}(Base.OneTo(3)))
     @test param_axes("s", 4) ==
-        Axis{:parameter}([:S]), Axis{:from}(Base.OneTo(4)), Axis{:to}(Base.OneTo(4))
+        (Axis{:parameter}([:S]), Axis{:from}(Base.OneTo(4)), Axis{:to}(Base.OneTo(4)))
 end

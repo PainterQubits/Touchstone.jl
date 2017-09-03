@@ -3,7 +3,7 @@ module Touchstone
 using FileIO, AxisArrays, Interpolations
 export Linear, Constant, loadset
 
-const tsextensions = [".s2p",".s3p",".s4p",".s5p",".s6p",".s7p",".s8p",".ts"]
+const tsextensions = [".s1p",".s2p",".s3p",".s4p",".s5p",".s6p",".s7p",".s8p",".ts"]
 function __init__()
     FileIO.add_format(format"TS", (), tsextensions)
 end

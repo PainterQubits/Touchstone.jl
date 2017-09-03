@@ -16,7 +16,7 @@ The gory details:
 
 ## Usage
 
-To load a Touchstone file with extension `.s2p`, `.s3p`, etc. into an
+To load a Touchstone file with extension `.s1p`, `.s2p`, `.s3p`, etc. into an
 [AxisArray](http://github.com/JuliaArrays/AxisArrays.jl), it could not be
 any easier:
 

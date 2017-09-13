@@ -87,4 +87,4 @@ Once you have imported the data, then you can:
 
 ## Caveats
 
-Touchstone v2 is not yet supported. Probably has bugs. Needs many more tests.
+Touchstone v2 is not yet supported.

@@ -162,14 +162,14 @@ function FileIO.load(s0::Stream{format"TS"};
         while true
             i += 1
             # TODO: Replace multiple spaces by one space.
-            dataline = split(l, ' ')
+            dataline = split(strip(l), ' ')
             length(dataline) != expectednum(nports, i) &&
                 error("unexpected number of values on line $lct.")
             if i == 1
                 push!(freq, parse(Float64, dataline[1]))
                 append!(data, (x->parse(Float64, x)).(dataline[2:end]))
             else
-                append!(data, dataline)
+                append!(data, (x->parse(Float64, x)).(dataline))
             end
             i == nl && break
             l = readline(s); lct+=1

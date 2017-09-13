@@ -1,5 +1,5 @@
 using Touchstone
-using Base.Test, AxisArrays
+using Base.Test, FileIO, AxisArrays
 
 using Touchstone: nlines, expectednum, format_axis, param_axes
 
@@ -68,4 +68,11 @@ end
         (Axis{:parameter}([:S]), Axis{:from}(Base.OneTo(3)), Axis{:to}(Base.OneTo(3)))
     @test param_axes("s", 4) ==
         (Axis{:parameter}([:S]), Axis{:from}(Base.OneTo(4)), Axis{:to}(Base.OneTo(4)))
+end
+
+@testset "Touchstone v1 file loading" begin
+    mys3p = load(joinpath(@__DIR__, "reim.s3p"))
+    @test mys3p[Axis{:format}].val == [:real, :imag]
+    @test mys3p[Axis{:from}].val == Base.OneTo(3)
+    @test mys3p[Axis{:to}].val == Base.OneTo(3)
 end

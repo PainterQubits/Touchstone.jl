@@ -71,8 +71,18 @@ end
 end
 
 @testset "Touchstone v1 file loading" begin
-    mys3p = load(joinpath(@__DIR__, "reim.s3p"))
-    @test mys3p[Axis{:format}].val == [:real, :imag]
-    @test mys3p[Axis{:from}].val == Base.OneTo(3)
-    @test mys3p[Axis{:to}].val == Base.OneTo(3)
+    @testset "> S2P parameter sweep" begin
+        sweep = loadset(joinpath(@__DIR__, "paramsweep"))
+        @test sweep[Axis{:format}].val == [:mag, :angle]
+        @test sweep[Axis{:from}].val == [1, 2]
+        @test sweep[Axis{:to}].val == [1, 2]
+        @test any(ax isa Axis{:BusLengthControl} for ax in axes(sweep))
+    end
+
+    @testset "> S3P file" begin
+        mys3p = load(joinpath(@__DIR__, "reim.s3p"))
+        @test mys3p[Axis{:format}].val == [:real, :imag]
+        @test mys3p[Axis{:from}].val == Base.OneTo(3)
+        @test mys3p[Axis{:to}].val == Base.OneTo(3)
+    end
 end

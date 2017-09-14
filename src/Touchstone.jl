@@ -273,6 +273,8 @@ struct dBAngle  <: Format end
 Reformat imported Touchstone data. The type can be one of `RealImag`, `MagAngle`, or
 `dBAngle`. Take care to use the special AxisArray indexing since the axes may not be in the
 same order afterwards.
+
+As usual for the Touchstone format, angles are in degrees.
 """
 function reformat(::Type{T}, A::AxisArray) where {T<:Format}
     if :format in axisnames(A)
@@ -296,14 +298,14 @@ _reformat(::Type{T}, ::Type{T}, A::AxisArray) where {T<:Format} = A
 function _reformat(::Type{MagAngle}, ::Type{RealImag}, A::AxisArray)
     cs = Complex.(A[Axis{:format}(:real)], A[Axis{:format}(:imag)])
     ind = findfirst(x -> x==:format, axisnames(A))
-    return AxisArray(cat(ndims(A), abs.(cs), angle.(cs)),
+    return AxisArray(cat(ndims(A), abs.(cs), rad2deg.(angle.(cs))),
         axes(A)[setdiff(1:ndims(A),ind)]..., Axis{:format}([:mag, :angle]))
 end
 
 function _reformat(::Type{dBAngle}, ::Type{RealImag}, A::AxisArray)
     cs = Complex.(A[Axis{:format}(:real)], A[Axis{:format}(:imag)])
     ind = findfirst(x -> x==:format, axisnames(A))
-    return AxisArray(cat(ndims(A), 20*log10.(abs.(cs)), angle.(cs)),
+    return AxisArray(cat(ndims(A), 20*log10.(abs.(cs)), rad2deg.(angle.(cs))),
         axes(A)[setdiff(1:ndims(A),ind)]..., Axis{:format}([:dB, :angle]))
 end
 

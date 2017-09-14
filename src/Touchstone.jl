@@ -229,23 +229,6 @@ function param_axes(param, nports)
     end
 end
 
-# """
-#     param_axis(param, nports)
-# Given a parameter code from the options line of the file and some number
-# of ports, return a suitable `AxisArrays.Axis{:parameter}` object, e.g.
-# `AxisArrays.Axis{:parameter}([:s11,:s21,:s12,:s22])`.
-# """
-# function param_axis(param, nports)
-#     if nports == 2
-#         return Axis{:parameter}(Symbol.(param.*["11","21","12","22"]))
-#     else
-#         numvec = string.(collect(1:nports))
-#         numrow = reshape(numvec,1,length(numvec))
-#         return Axis{:parameter}(
-#             Symbol.(param.*(permutedims(numvec.*numrow,(2,1))[:])))
-#     end
-# end
-
 """
     nlines(nports)
 Number of data lines for a particular frequency given `nports`.

@@ -1,7 +1,7 @@
 __precompile__()
 module Touchstone
 using FileIO, AxisArrays, Interpolations
-export Linear, Constant, loadset
+export Linear, Constant, RealImag, MagAngle, dBAngle, reformat, loadset
 
 const tsextensions = [".s1p",".s2p",".s3p",".s4p",".s5p",".s6p",".s7p",".s8p",".ts"]
 function __init__()
@@ -261,6 +261,80 @@ function expectednum(nports, linenum)
     linenumpp = mod(linenum - 1, lpp) + 1
     linenumpp == lpp && lpp != 1 && return rem(nports, 4)*2+adj
     return 8+adj
+end
+
+abstract type Format end
+struct RealImag <: Format end
+struct MagAngle <: Format end
+struct dBAngle  <: Format end
+
+"""
+    reformat(::Type{T}, A::AxisArray) where {T<:Format}
+Reformat imported Touchstone data. The type can be one of `RealImag`, `MagAngle`, or
+`dBAngle`. Take care to use the special AxisArray indexing since the axes may not be in the
+same order afterwards.
+"""
+function reformat(::Type{T}, A::AxisArray) where {T<:Format}
+    if :format in axisnames(A)
+        formats = A[Axis{:format}].val
+        if :real in formats && :imag in formats
+            _reformat(T, RealImag, A)
+        elseif :mag in formats && :angle in formats
+            _reformat(T, MagAngle, A)
+        elseif :dB in formats && :angle in formats
+            _reformat(T, dBAngle, A)
+        else
+            error("unknown formats in Axis{:format}.")
+        end
+    else
+        error("Axis{:format} missing.")
+    end
+end
+
+_reformat(::Type{T}, ::Type{T}, A::AxisArray) where {T<:Format} = A
+
+function _reformat(::Type{MagAngle}, ::Type{RealImag}, A::AxisArray)
+    cs = Complex.(A[Axis{:format}(:real)], A[Axis{:format}(:imag)])
+    ind = findfirst(x -> x==:format, axisnames(A))
+    return AxisArray(cat(ndims(A), abs.(cs), angle.(cs)),
+        axes(A)[setdiff(1:ndims(A),ind)]..., Axis{:format}([:mag, :angle]))
+end
+
+function _reformat(::Type{dBAngle}, ::Type{RealImag}, A::AxisArray)
+    cs = Complex.(A[Axis{:format}(:real)], A[Axis{:format}(:imag)])
+    ind = findfirst(x -> x==:format, axisnames(A))
+    return AxisArray(cat(ndims(A), 20*log10.(abs.(cs)), angle.(cs)),
+        axes(A)[setdiff(1:ndims(A),ind)]..., Axis{:format}([:dB, :angle]))
+end
+
+function _reformat(::Type{dBAngle}, ::Type{MagAngle}, A::AxisArray)
+    decibels = @. 20*log10(A[Axis{:format}(:mag)])
+    ind = findfirst(x -> x==:format, axisnames(A))
+    return AxisArray(cat(ndims(A), decibels, view(A, Axis{:format}(:angle))),
+        axes(A)[setdiff(1:ndims(A),ind)]..., Axis{:format}([:dB, :angle]))
+end
+
+function _reformat(::Type{RealImag}, ::Type{MagAngle}, A::AxisArray)
+    re = @. cosd(A[Axis{:format}(:angle)]) * A[Axis{:format}(:mag)]
+    im = @. sind(A[Axis{:format}(:angle)]) * A[Axis{:format}(:mag)]
+    ind = findfirst(x -> x==:format, axisnames(A))
+    return AxisArray(cat(ndims(A), re, im),
+        axes(A)[setdiff(1:ndims(A),ind)]..., Axis{:format}([:real, :imag]))
+end
+
+function _reformat(::Type{RealImag}, ::Type{dBAngle}, A::AxisArray)
+    re = @. cosd(A[Axis{:format}(:angle)]) * exp10(A[Axis{:format}(:mag)]/20)
+    im = @. sind(A[Axis{:format}(:angle)]) * exp10(A[Axis{:format}(:mag)]/20)
+    ind = findfirst(x -> x==:format, axisnames(A))
+    return AxisArray(cat(ndims(A), re, im),
+        axes(A)[setdiff(1:ndims(A),ind)]..., Axis{:format}([:real, :imag]))
+end
+
+function _reformat(::Type{MagAngle}, ::Type{dBAngle}, A::AxisArray)
+    mg = @. exp10(A[Axis{:format}(:dB)]/20)
+    ind = findfirst(x -> x==:format, axisnames(A))
+    return AxisArray(cat(ndims(A), mg, view(A, Axis{:format}(:angle))),
+        axes(A)[setdiff(1:ndims(A),ind)]..., Axis{:format}([:mag, :angle]))
 end
 
 end # module

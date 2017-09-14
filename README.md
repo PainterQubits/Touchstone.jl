@@ -23,22 +23,22 @@ any easier:
 ```
 julia> using Touchstone, FileIO, AxisArrays
 
-julia> load("/Users/ajkeller/Desktop/BusResonator_16/BusResonator_16_param01.s2p")
+julia> A = load(joinpath(Pkg.dir("Touchstone"), "test", "paramsweep", "BusResonator_17_param01.s2p"))
 6-dimensional AxisArray{Float64,6,...} with axes:
     :format, Symbol[:mag, :angle]
     :parameter, Symbol[:S]
     :to, Base.OneTo(2)
     :from, Base.OneTo(2)
-    :f, [8.0, 8.02, 8.04, 8.06, 8.08, 8.1, 8.12, 8.14, 8.16, 8.18  …  12.82, 12.84, 12.86, 12.88, 12.9, 12.92, 12.94, 12.96, 12.98, 13.0]
-    :BusLengthControl, [280.0]
-And data, a 2×1×2×2×848×1 Array{Float64,6}:
+    :f, [6.0, 6.05, 6.1, 6.15, 6.2, 6.25, 6.3, 6.35, 6.4, 6.45  …  15.55, 15.6, 15.65, 15.7, 15.75, 15.8, 15.85, 15.9, 15.95, 16.0]
+    :BusLengthControl, [100.0]
+And data, a 2×1×2×2×798×1 Array{Float64,6}:
 [:, :, 1, 1, 1, 1] =
-   0.999999
- -13.17    
+  1.0  
+ -3.613
 
 [:, :, 2, 1, 1, 1] =
-    1.905e-5
- -114.0     
+  2.039e-5
+ 75.309
 
 ...
 ```
@@ -50,22 +50,22 @@ as a collection of .s2p files in a folder, for example as exported by Sonnet,
 you can use `loadset` to import everything into *one* AxisArray:
 
 ```
-julia> loadset("/Users/ajkeller/Desktop/BusResonator_16/")
+julia> loadset(joinpath(Pkg.dir("Touchstone"), "test", "paramsweep"))
 6-dimensional AxisArray{Float64,6,...} with axes:
     :format, Symbol[:mag, :angle]
     :parameter, Symbol[:S]
     :to, [1, 2]
     :from, [1, 2]
-    :f, [8.0, 8.02, 8.04, 8.06, 8.08, 8.1, 8.12, 8.14, 8.16, 8.18  …  12.82, 12.84, 12.86, 12.88, 12.9, 12.92, 12.94, 12.96, 12.98, 13.0]
-    :BusLengthControl, [280.0, 510.0, 740.0, 970.0, 1200.0, 1430.0, 1660.0, 1890.0, 2120.0, 2350.0, 2580.0]
-And data, a 2×1×2×2×5624×11 Array{Float64,6}:
+    :f, [6.0, 6.05, 6.1, 6.15, 6.2, 6.25, 6.26015, 6.27006, 6.27975, 6.28922  …  15.5886, 15.6, 15.65, 15.7, 15.75, 15.8, 15.85, 15.9, 15.95, 16.0]
+    :BusLengthControl, [100.0, 600.0, 1100.0, 1600.0, 2100.0, 2600.0, 3100.0, 3600.0, 4100.0, 4600.0, 5100.0]
+And data, a 2×1×2×2×8561×11 Array{Float64,6}:
 [:, :, 1, 1, 1, 1] =
-   0.999999
- -13.17    
+  1.0  
+ -3.613
 
 [:, :, 2, 1, 1, 1] =
-    1.905e-5
- -114.0     
+  2.039e-5
+ 75.309   
 
 ...
 ```
@@ -79,11 +79,35 @@ frequency axes are merged, and missing values are interpolated. `Linear()` or `C
 The parameter is kept as a separate axis so that you can load S-parameters,
 Y-parameters, Z-parameters and the like into one `AxisArray`.
 
-Once you have imported the data, then you can:
+You can convert between the various formats (`RealImag`, `dBAngle`, `MagAngle`):
+
+```
+julia> reformat(RealImag, A)
+6-dimensional AxisArray{Float64,6,...} with axes:
+    :parameter, Symbol[:S]
+    :to, Base.OneTo(2)
+    :from, Base.OneTo(2)
+    :f, [6.0, 6.05, 6.1, 6.15, 6.2, 6.25, 6.3, 6.35, 6.4, 6.45  …  15.55, 15.6, 15.65, 15.7, 15.75, 15.8, 15.85, 15.9, 15.95, 16.0]
+    :BusLengthControl, [100.0]
+    :format, Symbol[:real, :imag]
+And data, a 1×2×2×798×1×2 Array{Float64,6}:
+[:, :, 1, 1, 1, 1] =
+ 0.998012  5.17103e-6
+
+[:, :, 2, 1, 1, 1] =
+ 5.17103e-6  0.900621
+
+...
+```
+
+Take care as the axes are reordered, so it is better to use the special Axis-based indexing
+(e.g. `A[Axis{:format}(:mag), ...]`).
+
+Once you have imported the data and formatted it to your liking then you can:
 
 - Plot heatmaps with, for example, one axis as frequency and one axis as a swept parameter, etc.
 - Do peak-finding as a function of a swept parameter
-- Other fun things
+- Do other fun things
 
 ## Caveats
 

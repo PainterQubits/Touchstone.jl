@@ -1,11 +1,16 @@
 __precompile__()
 module Touchstone
-using FileIO, AxisArrays, Interpolations
+
+using FileIO
+using AxisArrays
+using Interpolations
+using UUIDs
+
 export Linear, Constant, RealImag, MagAngle, dBAngle, reformat, loadset
 
 const tsextensions = [".s1p",".s2p",".s3p",".s4p",".s5p",".s6p",".s7p",".s8p",".ts"]
 function __init__()
-    FileIO.add_format(format"TS", (), tsextensions)
+    FileIO.add_format(format"TS", (), tsextensions, [:Touchstone => UUID("958a2305-7e5c-4f48-8401-e0b3f0c58adc")])
 end
 
 """
@@ -60,11 +65,11 @@ function loadset(path::String; interp = Linear())
                 first = false
                 newaxarrs = [
                     AxisArray(zeros(size(a)[1:4]..., length(faxis), size(a)[6:end]...),
-                        axes(a)[1:4]..., Axis{:f}(faxis), axes(a)[6:end]...)
+                    AxisArrays.axes(a)[1:4]..., Axis{:f}(faxis), AxisArrays.axes(a)[6:end]...)
                     ]
             else
                 push!(newaxarrs, AxisArray(zeros(size(a)[1:4]..., length(faxis),
-                    size(a)[6:end]...), axes(a)[1:4]..., Axis{:f}(faxis), axes(a)[6:end]...))
+                    size(a)[6:end]...), AxisArrays.axes(a)[1:4]..., Axis{:f}(faxis), AxisArrays.axes(a)[6:end]...))
             end
 
             # This is a little ugly, probably could be better but Interpolations.jl doesn't
@@ -82,7 +87,7 @@ function loadset(path::String; interp = Linear())
     end
 end
 
-function FileIO.load(f::File{format"TS"}; kwargs...)
+function load(f::File{format"TS"}; kwargs...)
     open(f) do s
         n = filename(f)
         ext = splitext(n)[2]
@@ -100,7 +105,7 @@ function FileIO.load(f::File{format"TS"}; kwargs...)
     end
 end
 
-function FileIO.load(s0::Stream{format"TS"};
+function load(s0::Stream{format"TS"};
         v2::Bool=false, nports::Int=2)
     v2 && error("Touchstone v2 not yet implemented.") #TODO
     @assert nports > 0
@@ -123,8 +128,8 @@ function FileIO.load(s0::Stream{format"TS"};
             while true
                 l = readline(s); lct+=1
                 l == "!< END PARAMS" && break
-                param = replace(l[4:end], " ", "")
-                (k,v) = (split(param, "=")...)
+                param = replace(l[4:end], " "=>"")
+                (k,v) = split(param, "=")
                 push!(sweepaxes, AxisArrays.Axis{Symbol(k)}([parse(Float64, v)]))
             end
             continue
@@ -134,12 +139,11 @@ function FileIO.load(s0::Stream{format"TS"};
         if l[1] == '#'              # Parse option line
             #TODO: check that the option line precedes all data lines
             #TODO: check that there is only one option line per file
-            #TODO: replace 1 or more whitespace by 1 space
             #TODO: more input sanitizing, etc.
-            optargs = split(lowercase(l),' ')[2:end]
+            optargs = split(lowercase(l), ' ', keepempty=false)[2:end]
 
             # resistances specified as e.g. "R 50.0"
-            ridx = findfirst(x->x=="R", optargs)
+            ridx = findfirst(x->x=="r", optargs)
             (ridx > 0) && (opts[:resistance] = optargs[ridx+1])
 
             fs = intersect(["ghz","mhz","khz","hz"], optargs)
@@ -161,8 +165,7 @@ function FileIO.load(s0::Stream{format"TS"};
         i = 0
         while true
             i += 1
-            # TODO: Replace multiple spaces by one space.
-            dataline = split(strip(l), ' ')
+            dataline = split(strip(l), ' ', keepempty=false)
             length(dataline) != expectednum(nports, i) &&
                 error("unexpected number of values on line $lct.")
             if i == 1

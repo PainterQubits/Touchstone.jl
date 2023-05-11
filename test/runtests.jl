@@ -1,5 +1,7 @@
 using Touchstone
-using Base.Test, FileIO, AxisArrays
+using Test
+using FileIO
+using AxisArrays
 
 using Touchstone: nlines, expectednum, format_axis, param_axes
 
@@ -76,7 +78,7 @@ end
         @test sweep[Axis{:format}].val == [:mag, :angle]
         @test sweep[Axis{:from}].val == [1, 2]
         @test sweep[Axis{:to}].val == [1, 2]
-        @test any(ax isa Axis{:BusLengthControl} for ax in axes(sweep))
+        @test any(ax isa Axis{:BusLengthControl} for ax in AxisArrays.axes(sweep))
     end
 
     @testset "> S3P file" begin
